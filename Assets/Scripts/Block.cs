@@ -10,7 +10,7 @@ public class Block : MonoBehaviour
     /* 
     block의 이동 범위 : -4 ~ +5
      */
-    private int blockLength;
+    private int blockSize;
     [SerializeField]private Rigidbody2D r2D;
     private RigidbodyConstraints2D defaultCons = 
         RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezeRotation;
@@ -31,7 +31,7 @@ public class Block : MonoBehaviour
     
     private void Start() {
         r2D = GetComponent<Rigidbody2D>();
-        blockLength = (int)spr.size.x;
+        blockSize = (int)spr.size.x;
         this.OnCollisionStay2DAsObservable()
             .Where(x => x.gameObject.CompareTag("Wall"))
             .Subscribe(_ => Debug.Log("collision"));
@@ -92,7 +92,7 @@ public class Block : MonoBehaviour
             this.transform.position = transform.position.ChangeOnlyX(startX);
         } 
         else {
-            if(blockLength % 2 == 1) {
+            if(blockSize % 2 == 1) {
                 //even
                 this.transform.position = transform.position.ChangeOnlyX(Mathf.Round(tempX));
             } else { 
@@ -151,7 +151,7 @@ public class Block : MonoBehaviour
 
     private void SendStartState() {
         Debug.Log("send");
-        startDrag.OnNext(new InitialDrag(spr, transform.position));
+        startDrag.OnNext(new InitialDrag(spr, transform.position, blockSize));
     }
     
     private void SendPosition() {

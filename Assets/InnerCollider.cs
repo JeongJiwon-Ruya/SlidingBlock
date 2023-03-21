@@ -16,11 +16,11 @@ public class InnerCollider : MonoBehaviour
 
         this.OnTriggerEnter2DAsObservable()
             .Where(x => (x.gameObject.name != this.name) && x.gameObject.CompareTag("Wall") || x.gameObject.CompareTag("Block"))
-            .Subscribe(x => { parent.ChangeBlockedState(x.gameObject, isLeft || isLeft, true); });
+            .Subscribe(x => { parent.ChangeBlockedState(x.gameObject, isLeft, true); });
         
         this.OnTriggerExit2DAsObservable()
             .Where(x => (x.gameObject.name != this.name) && x.gameObject.CompareTag("Wall") || x.gameObject.CompareTag("Block"))
-            .Subscribe(x => { parent.ChangeBlockedState(x.gameObject, isLeft || isLeft, false); });
+            .Subscribe(x => { parent.ChangeBlockedState(x.gameObject, isLeft, false); });
     }
 
 }
