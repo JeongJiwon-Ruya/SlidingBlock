@@ -1,2 +1,2 @@
 # SlidingBlock
-Jewel Sliding like Block Game
+Block Sliding Game like 'Jewel Sliding'
