@@ -1,100 +1,109 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
+using System;	
+using System.Diagnostics.CodeAnalysis;
 using UnityEngine;
 using UniRx;
 using UniRx.Triggers;
 
+[SuppressMessage("ReSharper", "IdentifierTypo")]
 public class Block : MonoBehaviour
 {
-    /* 
-    block의 이동 범위 : -4 ~ +5
-     */
     private int blockSize;
-    [SerializeField]private Rigidbody2D r2D;
-    private RigidbodyConstraints2D defaultCons = 
-        RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezeRotation;
     private float startX;
     private float polationX;
     private float freezeY;
     public SpriteRenderer spr;
-    public bool blocked_L, blocked_R;
+
+    private bool freezeX;
+
+    public float limitL;
+    public float limitR;
+    public bool freezeL;
+    public bool freezeR;
+    private float freezeXPos;
     
-    private static Subject<InitialDrag> startDrag = new Subject<InitialDrag>();
-    public static IObservable<InitialDrag> StartDragEvent => startDrag;
-
-    private static ReactiveProperty<Vector3> onDrag = new ReactiveProperty<Vector3>();
-    public static IReadOnlyReactiveProperty<Vector3> OnDragEvent => onDrag;
-
-    public static Subject<Unit> endDrag = new Subject<Unit>();
-    public static IObservable<Unit> EndDragEvent => endDrag;
+    private static readonly Subject<InitialDrag> StartDrag = new ();
+    public static IObservable<InitialDrag> StartDragEvent => StartDrag;
+    private static readonly ReactiveProperty<Vector3> OnDrag = new ();
+    public static IReadOnlyReactiveProperty<Vector3> OnDragEvent => OnDrag;
+    private static readonly Subject<Unit> EndDrag = new ();
+    public static IObservable<Unit> EndDragEvent => EndDrag;
     
     private void Start() {
-        r2D = GetComponent<Rigidbody2D>();
-        blockSize = (int)spr.size.x;
+	    blockSize = (int)spr.size.x;
         this.OnCollisionStay2DAsObservable()
             .Where(x => x.gameObject.CompareTag("Wall"))
             .Subscribe(_ => Debug.Log("collision"));
     }
 
+    public Vector3 startPos;
     private void OnMouseDown() {
-        startX = this.transform.position.x;
-        pastX = startX;
+	    var position = this.transform.position;
+        startX = position.x;
+        startPos = position;
         //x값에 한해서, block의 pivot값과 마우스 클릭한 지점간의 차이값을 구해서 보정해줘야함.
-        r2D.constraints = RigidbodyConstraints2D.FreezeRotation | RigidbodyConstraints2D.FreezePositionY;
-        freezeY = this.transform.position.y;
-        polationX = this.transform.position.x 
-            - Camera.main.ScreenToWorldPoint(Input.mousePosition).x;
+        freezeY = position.y;
+        polationX = position.x - Camera.main!.ScreenToWorldPoint(Input.mousePosition).x;
         SendStartState();
         SendPosition();
     }
 
-    private float pastX;
-    
     private void OnMouseDrag() {
-        /*
-         * 1. 왼쪽, 오른쪽 이동을 감지해야함. V
-         * 2. 현재 한쪽이라도 블록되있는지 감지해야함.
-         */
-        var temp = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        if (temp.x + polationX < startX) { //우측
-            if (!blocked_L) {
-                out_L = false;
-                transform.position = temp
-                    .GetTransformByFreezeYAndZeroZ(polationX, freezeY);
-            }
-            else {
-                if (newStandardX < temp.x) {
-                    blocked_L = false;
-                }
-            }
-        }
-        else { //좌측
-            if (!blocked_R) {
-                out_R = false;
-                transform.position = temp
-                    .GetTransformByFreezeYAndZeroZ(polationX, freezeY);
-            }
-            else {
-                if (newStandardX > temp.x) {
-                    blocked_R = false;
-                }
-            }
-        }
-
-        pastX = transform.position.x;
-        SendPosition();
+	    var temp = Camera.main!.ScreenToWorldPoint(Input.mousePosition);
+	    var tempBlockX = transform.position.x;
+	    
+	    if(temp.x + polationX < limitL) {
+	        transform.position = new Vector3(limitL, startPos.y, -9);
+	        return;
+	    }
+	    if(limitR < temp.x + polationX) {
+		    transform.position = new Vector3(limitR, startPos.y, -9);
+		    return;
+	    }
+        
+	    
+	    if (freezeL) {
+		    if (freezeXPos < temp.x + polationX) {
+			    transform.position = temp.GetTransformByFreezeYAndZeroZ(polationX, freezeY);
+			    freezeL = false;
+			    SendPosition();
+			    return;
+		    }
+	    }
+	    if (freezeR) {
+		    Debug.Log(temp.x);
+		    if (temp.x + polationX < freezeXPos) {
+			    transform.position = temp.GetTransformByFreezeYAndZeroZ(polationX, freezeY);
+			    freezeR = false;
+			    SendPosition();
+			    return;
+		    }
+	    }
+        
+	    if (limitL <= tempBlockX && tempBlockX <= limitR) {
+		    transform.position = temp.GetTransformByFreezeYAndZeroZ(polationX, freezeY);
+		    SendPosition();
+	    }
+	    
+	    if (tempBlockX < limitL) {
+		    freezeL = true;
+		    freezeXPos = transform.position.x;
+	    }
+	    if (limitR < tempBlockX) {
+		    freezeR = true;
+		    freezeXPos = transform.position.x;
+	    }
     }
 
+    [SuppressMessage("ReSharper", "Unity.InefficientPropertyAccess")]
     private void OnMouseUp() {
         var tempX = this.transform.position.x;
         if(Mathf.Abs(startX - tempX) < 0.5f) {
-            this.transform.position = transform.position.ChangeOnlyX(startX);
+            transform.position = transform.position.ChangeOnlyX(startX);
         } 
         else {
             if(blockSize % 2 == 1) {
                 //even
-                this.transform.position = transform.position.ChangeOnlyX(Mathf.Round(tempX));
+                transform.position = transform.position.ChangeOnlyX(Mathf.Round(tempX));
             } else { 
                 //odd
                 /* 
@@ -103,62 +112,31 @@ public class Block : MonoBehaviour
                 R to L : -0.5
                 */
                 if(tempX < startX)  // R to L
-                    this.transform.position = transform.position.ChangeOnlyX(Mathf.Round(tempX+0.5f) - 0.5f);
+                    transform.position = transform.position.ChangeOnlyX(Mathf.Round(tempX+0.5f) - 0.5f);
                 else
-                    this.transform.position = transform.position.ChangeOnlyX(Mathf.Round(tempX-0.5f) + 0.5f);
+                    transform.position = transform.position.ChangeOnlyX(Mathf.Round(tempX-0.5f) + 0.5f);
             }
         }
 
         SendEndState();
-        r2D.constraints = defaultCons;
     }
-
-    public bool out_L, out_R;
-    public float border_L = -99, border_R = 99;
-    public float newStandardX;
     
-    public void ChangeBlockedState(GameObject border, bool isLeft, bool value) {
-        var width = border.GetComponent<SpriteRenderer>().size.x;
-        if (isLeft) {
-            blocked_L = value;
-            if (value) {
-                int borderX = Mathf.RoundToInt(border.GetComponent<Transform>().position.x);
-                border_L = width switch {
-                    1 => borderX + 1,
-                    2 or 3 => borderX + 2,
-                    4 or 5 => borderX + 3,
-                    _ => border_L
-                };
-                newStandardX = Camera.main.ScreenToWorldPoint(Input.mousePosition).x;
-            }
-            else border_L = -99;
-        }
-        else {
-            blocked_R = value;
-            if (value) {
-                int borderX = Mathf.CeilToInt(border.GetComponent<Transform>().position.x);
-                border_R = width switch {
-                    1 => borderX - 1,
-                    2 or 3 => borderX - 2,
-                    4 or 5 => borderX - 3,
-                    _ => border_R
-                };
-                newStandardX = Camera.main.ScreenToWorldPoint(Input.mousePosition).x;
-            }
-            else border_R = 99;
-        }
+    public void SetDragLimit((int left, int right) limit) {
+	    limitL = startX - limit.left;
+	    limitR = startX + limit.right;
+	    Debug.Log($"{startX} , {limitL}, {limitR}");
     }
-
+    
     private void SendStartState() {
         Debug.Log("send");
-        startDrag.OnNext(new InitialDrag(spr, transform.position, blockSize));
+        StartDrag.OnNext(new InitialDrag(this, spr, transform.position, blockSize));
     }
     
     private void SendPosition() {
-        onDrag.Value = this.transform.position;
+        OnDrag.Value = this.transform.position;
     }
 
     private void SendEndState() {
-        endDrag.OnNext(Unit.Default);
+        EndDrag.OnNext(Unit.Default);
     }
 }

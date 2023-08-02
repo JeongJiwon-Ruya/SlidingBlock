@@ -6,11 +6,13 @@ using UnityEngine;
 using UniRx;
 
 public class InitialDrag {
-    public int blockSize;
+		public Block block;
+		public int blockSize;
     public SpriteRenderer spriteRenderer;
     public Vector3 pos;
 
-    public InitialDrag(SpriteRenderer _spriteRenderer, Vector3 _pos, int _blockSize) {
+    public InitialDrag(Block _block, SpriteRenderer _spriteRenderer, Vector3 _pos, int _blockSize) {
+	    block = _block;
         spriteRenderer = _spriteRenderer;
         pos = _pos;
         blockSize = _blockSize;
@@ -30,10 +32,37 @@ public class GameManager : MonoBehaviour
 
     private InitialDrag tempInitialDrag;
 
+
+    private int[] testline = new[] { 0, 0, 2, 2, 0, 0, 0, 1, 0, 0 };
+
     void Start() {
         subscription1 = Block.OnDragEvent.Subscribe(BlockDragHandler);
         subscription2 = Block.StartDragEvent.Subscribe(StartDragHandler);
         subscription3 = Block.EndDragEvent.Subscribe(EndDragHandler);
+    }
+
+    private (int left, int right) LimitCalculator(int[] _line, int blockIndex) {
+	    int left = 0;
+	    int right = 0;
+	    for (int i = 0; i < _line.Length; i++) {
+		    if (_line[i] == blockIndex) {
+			    for (int j = i-1; j > -1; j--) {
+				    if (_line[j] != 0) break;
+				    left++;
+			    }
+		    }
+	    }
+	    for (int i = _line.Length - 1; i > 0; i--) {
+		    if (_line[i] == blockIndex) {
+			    for (int j = i + 1; j < _line.Length; j++) {
+				    if (_line[j] != 0) break;
+				    right++;
+			    }
+		    }
+	    }
+
+	    Debug.Log($"left : {left} , right : {right}");
+	    return (left, right);
     }
 
     private void StartDragHandler(InitialDrag initialDrag) {
@@ -52,12 +81,11 @@ public class GameManager : MonoBehaviour
         h.drawMode = SpriteDrawMode.Tiled;
         h.size = initialDrag.spriteRenderer.size;
         silhouette = g;
-
+        initialDrag.block.SetDragLimit(LimitCalculator(testline,2));
     }
     
     public void BlockDragHandler(Vector3 pos) {
-        Debug.Log(pos);
-        if(tempInitialDrag == null) return;
+	    if(tempInitialDrag == null) return;
         var list = OddEvenCorrection(tempInitialDrag, pos.x);
         if (list.SequenceEqual(activeLines)) return;
         activeLines.ForEach(index => lines[index].SetActive(false));
@@ -82,7 +110,7 @@ public class GameManager : MonoBehaviour
 
     private List<int> OddEvenCorrection(InitialDrag block, float blockPosX) {
         var result = new List<int>();
-        var x = blockPosX + 4;
+        var x = blockPosX;
         if (block.blockSize % 2 == 0) { //짝수 => x가 .5 임
             x -= (block.blockSize / 2);
             for (int i = 0; i < block.blockSize; i++) {
