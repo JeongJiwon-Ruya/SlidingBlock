@@ -5,7 +5,7 @@ using UnityEngine;
 
 public static class BlockRandomGenerateList{
     // 1부터 5까지의 숫자
-    private static readonly int[] numbers = { 1, 2, 3, 4, 5, 6 };
+    private static readonly int[] numbers = { 1, 2, 3, 4, 5 };
     private static IEnumerable<IEnumerable<int>> combinations;
     private static List<List<int>> sum10List;
 
@@ -18,7 +18,7 @@ public static class BlockRandomGenerateList{
             foreach (IEnumerable<int> combination in combinations) {
                 if (combination.Sum() == 10 && (combination.Count(item => item == 1) < 5)) {
                     sum10List.Add(combination.ToList());
-                    Debug.Log(string.Join(" + ", combination) + " = 10");
+//                    Debug.Log(string.Join(" + ", combination) + " = 10");
                 }
             }
         }

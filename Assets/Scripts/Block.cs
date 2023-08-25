@@ -5,8 +5,8 @@ using UniRx;
 using UniRx.Triggers;
 
 [SuppressMessage("ReSharper", "IdentifierTypo")]
-public class Block : MonoBehaviour
-{
+public class Block : MonoBehaviour {
+		public int code;
     private int blockSize;
     private float startX;
     private float polationX;
@@ -25,8 +25,8 @@ public class Block : MonoBehaviour
     public static IObservable<InitialDrag> StartDragEvent => StartDrag;
     private static readonly ReactiveProperty<Vector3> OnDrag = new ();
     public static IReadOnlyReactiveProperty<Vector3> OnDragEvent => OnDrag;
-    private static readonly Subject<Unit> EndDrag = new ();
-    public static IObservable<Unit> EndDragEvent => EndDrag;
+    private static readonly Subject<Vector3> EndDrag = new ();
+    public static IObservable<Vector3> EndDragEvent => EndDrag;
     
     private void Start() {
 	    blockSize = (int)spr.size.x;
@@ -59,8 +59,7 @@ public class Block : MonoBehaviour
 		    transform.position = new Vector3(limitR, startPos.y, -9);
 		    return;
 	    }
-        
-	    
+
 	    if (freezeL) {
 		    if (freezeXPos < temp.x + polationX) {
 			    transform.position = temp.GetTransformByFreezeYAndZeroZ(polationX, freezeY);
@@ -137,6 +136,10 @@ public class Block : MonoBehaviour
     }
 
     private void SendEndState() {
-        EndDrag.OnNext(Unit.Default);
+        EndDrag.OnNext(transform.position);
+    }
+
+    public void DestroyAnimation() {
+	    Destroy(gameObject);
     }
 }

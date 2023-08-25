@@ -19,12 +19,10 @@ public class InitialDrag {
     }
 }
 
-public class GameManager : MonoBehaviour
-{
-    //어떤 행위들을 이벤트로 제어할 수 있을까?
-    //생각나는건... 한 블록을 선택했을때 나머지 블록들을 고정시켜두도록 한다던지,
-    //1line이 완성됬을 때, 터질 블록들에게 메시지를 보낸다던지..
-    private IDisposable subscription1, subscription2, subscription3;
+public class GameManager : MonoBehaviour {
+	public BlockGenerator blockGenerator;
+	
+		private IDisposable subscription1, subscription2, subscription3;
 
     [SerializeField] private GameObject silhouette;
     public List<GameObject> lines;
@@ -32,44 +30,55 @@ public class GameManager : MonoBehaviour
 
     private InitialDrag tempInitialDrag;
 
-
-    private int[] testline = new[] { 0, 0, 2, 2, 0, 0, 0, 1, 0, 0 };
-
     void Start() {
         subscription1 = Block.OnDragEvent.Subscribe(BlockDragHandler);
         subscription2 = Block.StartDragEvent.Subscribe(StartDragHandler);
         subscription3 = Block.EndDragEvent.Subscribe(EndDragHandler);
     }
 
-    private (int left, int right) LimitCalculator(int[] _line, int blockIndex) {
-	    int left = 0;
-	    int right = 0;
-	    for (int i = 0; i < _line.Length; i++) {
-		    if (_line[i] == blockIndex) {
-			    for (int j = i-1; j > -1; j--) {
-				    if (_line[j] != 0) break;
-				    left++;
+    private (int left, int right) LimitCalculator(InitialDrag initialDrag) {
+	    var current = new int[10];
+	    var firstIndex = 0;
+	    var lastIndex = 0;
+	    for (int i = 0; i < 10; i++) {
+		    for (int j = 0; j < 10; j++) {
+			    if (blockGenerator.blockMatrix[i, j] == initialDrag.block.code) { 여기부터.
+				    currentBlockExistLineIndex = i;
+				    firstIndex = j;
+				    for (int k = 0; k < 10; k++) {
+					    current[k] = blockGenerator.blockMatrix[i, k];
+				    }
+				    lastIndex = j;
+				    for (int l = j+1; l < 10; l++) {
+					    if (blockGenerator.blockMatrix[i, l] != initialDrag.block.code) break;
+					    lastIndex = l;
+				    }
+				    goto ZeroCalculate;
 			    }
 		    }
 	    }
-	    for (int i = _line.Length - 1; i > 0; i--) {
-		    if (_line[i] == blockIndex) {
-			    for (int j = i + 1; j < _line.Length; j++) {
-				    if (_line[j] != 0) break;
-				    right++;
-			    }
-		    }
+	    //양옆 0 있는지, 몇개인지 계산. 
+	    ZeroCalculate :
+	    var left = 0;
+	    var right = 0;
+	    for (int i = firstIndex - 1; i > -1; i--) {
+		    if (current[i] != 0) break;
+		    left++;
 	    }
-
+	    for (int i = lastIndex + 1; i < 10; i++) {
+		    if (current[i] != 0) break;
+		    right++;
+	    }
 	    Debug.Log($"left : {left} , right : {right}");
 	    return (left, right);
     }
+
+    private int currentBlockExistLineIndex;
 
     private void StartDragHandler(InitialDrag initialDrag) {
         tempInitialDrag = initialDrag;
         //선택한 블록 길이만큼 경계선 칠해주기
         activeLines = OddEvenCorrection(tempInitialDrag, tempInitialDrag.pos.x);
-        
         activeLines.ForEach(index => lines[index].SetActive(true));
 
         var g = new GameObject();
@@ -81,7 +90,13 @@ public class GameManager : MonoBehaviour
         h.drawMode = SpriteDrawMode.Tiled;
         h.size = initialDrag.spriteRenderer.size;
         silhouette = g;
-        initialDrag.block.SetDragLimit(LimitCalculator(testline,2));
+        //initialDrag.block.SetDragLimit(LimitCalculator(testline,2));
+        
+        /*
+         * 현재 블록의 코드를 읽고, BlockMatrix를 확인해서, 몇번째 라인에 있고, 옆에 0인 칸이 몇개가 있어서 좌우로 몇칸 움직일 수 있는지 계산해서,
+         * 행렬값을 전달해야함. LimitCalculator로 계산한 뒤, SetDragLimit로 전달.
+         */
+        initialDrag.block.SetDragLimit(LimitCalculator(initialDrag));
     }
     
     public void BlockDragHandler(Vector3 pos) {
@@ -101,11 +116,32 @@ public class GameManager : MonoBehaviour
         //현재 블록 위치가 기준점 기준으로 좌 또는 우로 얼마나 움직였는지 판단하여 경계선 칠해주는거 변경.
     }
 
-    public void EndDragHandler(Unit x) {
-        GameObject.Destroy(silhouette);
+    public void EndDragHandler(Vector3 endPosition) {
+        Destroy(silhouette);
         foreach (var variable in lines) {
             variable.SetActive(false);
         }
+
+        if (tempInitialDrag.pos == endPosition) return; //이동이 없었을 경우.
+        //있을 경우 하술.
+        int distance = (int)(endPosition.x - tempInitialDrag.pos.x);
+        
+        //distance만큼 code블록을 이동.
+        var movedLine = new int[10];
+        for (int i = 0; i < 10; i++) {
+	        if (blockGenerator.blockMatrix[currentBlockExistLineIndex, i] != tempInitialDrag.block.code) {
+		        movedLine[i] = blockGenerator.blockMatrix[currentBlockExistLineIndex, i];
+	        }
+	        else {
+		        movedLine[i + distance] = blockGenerator.blockMatrix[currentBlockExistLineIndex, i];
+	        }
+        }
+        for (int i = 0; i < 10; i++) {
+	        blockGenerator.blockMatrix[currentBlockExistLineIndex, i] = movedLine[i];
+        }
+        
+        //이젠, 블록이 이동했으니, (중력 이벤트 실행 후, 터칠수 있는 라인 있는지 계산. 있으면 터치기.) 터지면 또 중력 이벤트 실행, 끝나면 터칠수 있는 라인 있는지 계산. 있으면 터치기
+        StartCoroutine(blockGenerator.UpdateGravityAndExplosion(currentBlockExistLineIndex, tempInitialDrag.block.code));
     }
 
     private List<int> OddEvenCorrection(InitialDrag block, float blockPosX) {
