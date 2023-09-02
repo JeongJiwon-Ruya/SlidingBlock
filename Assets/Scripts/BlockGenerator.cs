@@ -43,7 +43,11 @@ public class BlockGenerator : MonoBehaviour {
 	public int[,] blockMatrix = new int[10, 10];
 	public List<Block> activeBlocksList = new(); //블록은 1차원 리스트에 저장해놔도 되지않나?
 
-	private IEnumerator Start() {
+	private void Start() {
+		StartCoroutine(InitializeNewBlock());
+	}
+
+	private IEnumerator InitializeNewBlock() {
 		
 		BlockRandomGenerateList.Initialize();
 		//1
@@ -60,7 +64,7 @@ public class BlockGenerator : MonoBehaviour {
 			if (t > 0) {
 				Debug.Log("t : " + t);
 				var newBlock = Instantiate(block[t-1]);
-				tempCodeIndex += Mathf.Abs(t) - 1; //하필 마지막값에서 code값을 뽑음...
+				tempCodeIndex += t - 1; //하필 마지막값에서 code값을 뽑음...
 				newBlock.code = newLineData.codeArrayList[tempCodeIndex];
 				var xPos = 0; // 0 ~ 9 사이에. 1이면 그대로 배치, 2 -> 0.5 3 -> 1, 4 -> 1.5 5 -> 2
 				Debug.Log(tempCodeIndex + " , " + t);
@@ -68,6 +72,7 @@ public class BlockGenerator : MonoBehaviour {
 				activeBlocksList.Add(newBlock);
 				risingBlocksData.Add(new BlockMoveData(newBlock, 1));
 			} else {
+				tempCodeIndex += Mathf.Abs(t);
 			}
 			tempUIIndex += Mathf.Abs(t);
 		}
@@ -154,7 +159,7 @@ public class BlockGenerator : MonoBehaviour {
 				}
 			}
 
-			for (int i = destroyLines[0]-1; i < -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
+			for (int i = destroyLines[0]-1; i > -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
 				int firstIndex = 0;
 				while(firstIndex < 10) { //이 while문은 한줄을 처리함.
 					/*
@@ -184,7 +189,7 @@ public class BlockGenerator : MonoBehaviour {
 						lastIndex++;
 					}
 					
-					for (int j = i-1; j < 10; j++) { //한칸 밑부터 아래로 검색
+					for (int j = i+1; j < 10; j++) { //한칸 밑부터 아래로 검색
 						if (blockMatrix[j, firstIndex] == 0 && blockMatrix[j, lastIndex] == 0) { //밑에가 0이면,
 							for (int k = firstIndex; k <= lastIndex; k++) { //한칸 아래로 내리기
 								blockMatrix[j-1, k] = 0;
@@ -232,6 +237,15 @@ public class BlockGenerator : MonoBehaviour {
 		
 		//새로운 블록이 아래에서 올라왔을때, 터지는 라인이 없는 경우
 		Debug.Log("상황 종료");
+		var temp = "";
+		for (int i = 0; i < 10; i++) {
+			for (int j = 0; j < 10; j++) {
+				temp += blockMatrix[i, j] + " ";
+			}
+			temp += "\n";
+		}
+
+		Debug.Log(temp);
 	}
 
 	private (List<int> originalList, int[] codeArrayList) GenerateBlocks() {
@@ -269,7 +283,76 @@ public class BlockGenerator : MonoBehaviour {
 		 * 3. 있으면 터치고 1로 돌아감.
 		 * 4. 없으면 종료.
 		 */
-		int leftFall = 0;
+		var pastMatrix1 = (int[,])blockMatrix.Clone();
+		for (int i = 9; i > -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
+			int firstIndex = 0;
+			while(firstIndex < 10) { //이 while문은 한줄을 처리함.
+				/*
+				 * for문 한번에 끝나려면 행렬을 마지막에 업데이트 해야함
+				 *
+				 * 0. 0일때는 pass. 0이외일때만 탐색
+				 * 1. '4'를 탐지한 후, '4'가 몇번째 열까지 있는지 확인
+				 * 2. 첫번째'4', 마지막 '4'의 index값을 갖고 아래로 탐색 시작
+				 * 3. 첫번째, 마지막 위치 값이 모두 0이면 아래로 진행.
+				 * 4. 첫번째, 마지막 둘중 하나라도 0이 아니면 break.
+				 * 5. 아래의 0을 찾았다면, 마지막 0의 위치로 4들을 이동시킴. 아니면 이동시키면서 아래로 진행해도됨. 이동시키면서 탐색하는게 좋을듯?
+				 * 6. 다음 index는 4의 마지막 위치 다음부터 다시 진행
+				 */
+
+				
+				if(blockMatrix[i,firstIndex] == 0) {
+					//블록 없음.
+					firstIndex++;
+					continue;
+				}
+				//블록이 존재.
+				var currentBlockCode = blockMatrix[i, firstIndex];
+				int lastIndex = firstIndex;
+				while (true) { //어디까지 현재 블록이 있는지 탐색
+					if (lastIndex == 10 || blockMatrix[i, lastIndex] != currentBlockCode) {
+						lastIndex--;
+						break;
+					}
+					lastIndex++;
+				}
+					
+				for (int j = i+1; j < 10; j++) { //한칸 밑부터 아래로 검색
+					if (blockMatrix[j, firstIndex] == 0 && blockMatrix[j, lastIndex] == 0) { //밑에가 0이면,
+						for (int k = firstIndex; k <= lastIndex; k++) { //한칸 아래로 내리기
+							blockMatrix[j-1, k] = 0;
+							blockMatrix[j, k] = currentBlockCode;
+						} continue;
+					} break; //더 내려갈게 없다면, 이 블록에 대해 상황 종료.
+				}
+				firstIndex = lastIndex + 1;
+			}
+		}
+		
+		var fallingBlocksData1 = new List<BlockMoveData>();
+		for (int i = 8; i > 0; i--) {
+			for (int j = 0; j < 9; j++) {
+				if (blockMatrix[i, j] == 0) continue;
+				for (int k = i; k < 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
+					if (pastMatrix1[k, j] == blockMatrix[i, j]) {
+						var fallingDistance = i - k; //if a == 0이면 필요없는 값. i는 현재 행, k는 과거 행
+						var targetBlock = activeBlocksList.First(x => x.code == blockMatrix[i, j]);
+						fallingBlocksData1.Add(new BlockMoveData(targetBlock, fallingDistance));
+					}
+				}
+			}
+		}
+		//떨어지는 애니메이션 재생.
+		float time = 0f;
+		float speed = 0.1f;
+		while (time < 1f) {
+			foreach (var variable in fallingBlocksData1) {
+				variable.block.transform.Translate(new Vector3(variable.distance * speed, 0, 0));
+			}
+			time += speed;
+			yield return new WaitForSeconds(Time.deltaTime);
+		}
+		
+		/*int leftFall = 0;
 		int rightFall = 0;
 		for (int i = 0; i < 10; i++) {
 			if (blockMatrix[existLineIndex, i] == blockCode) {
@@ -294,7 +377,7 @@ public class BlockGenerator : MonoBehaviour {
 				blockMatrix[existLineIndex, i] = 0;
 				blockMatrix[existLineIndex + fallDistance, i] = blockCode;
 			}
-		}
+		}*/
 		/*
 		 * 상하 이동 애니메이션 재생
 		 * activeBlockList에서 끌어와서 fallDistance만큼 재생시키면 될듯.
@@ -345,7 +428,7 @@ public class BlockGenerator : MonoBehaviour {
 				}
 			}
 
-			for (int i = destroyLines[0]-1; i < -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
+			for (int i = destroyLines[0]-1; i > -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
 				int firstIndex = 0;
 				while(firstIndex < 10) { //이 while문은 한줄을 처리함.
 					/*
@@ -375,7 +458,7 @@ public class BlockGenerator : MonoBehaviour {
 						lastIndex++;
 					}
 					
-					for (int j = i-1; j < 10; j++) { //한칸 밑부터 아래로 검색
+					for (int j = i+1; j < 10; j++) { //한칸 밑부터 아래로 검색
 						if (blockMatrix[j, firstIndex] == 0 && blockMatrix[j, lastIndex] == 0) { //밑에가 0이면,
 							for (int k = firstIndex; k <= lastIndex; k++) { //한칸 아래로 내리기
 								blockMatrix[j-1, k] = 0;
@@ -408,8 +491,8 @@ public class BlockGenerator : MonoBehaviour {
 				}
 			}
 			//떨어지는 애니메이션 재생.
-			float time = 0f;
-			float speed = 0.1f;
+			time = 0f;
+			speed = 0.1f;
 			while (time < 1f) {
 				foreach (var variable in fallingBlocksData) {
 					variable.block.transform.Translate(new Vector3(variable.distance * speed, 0, 0));
@@ -423,6 +506,17 @@ public class BlockGenerator : MonoBehaviour {
 		
 		//새로운 블록이 아래에서 올라왔을때, 터지는 라인이 없는 경우
 		Debug.Log("상황 종료");
+		var temp = "";
+		for (int i = 0; i < 10; i++) {
+			for (int j = 0; j < 10; j++) {
+				temp += blockMatrix[i, j] + " ";
+			}
+			temp += "\n";
+		}
+
+		Debug.Log(temp);
 		//====================================================================================이부분은 start에서도 사용하고, 코루틴으로 해야되서, 함수 하나 파야할듯. END
+
+		StartCoroutine(InitializeNewBlock());
 	}
 }
