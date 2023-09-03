@@ -7,7 +7,7 @@ using UniRx.Triggers;
 [SuppressMessage("ReSharper", "IdentifierTypo")]
 public class Block : MonoBehaviour {
 		public int code;
-    private int blockSize;
+    public int blockSize;
     private float startX;
     private float polationX;
     private float freezeY;
@@ -123,11 +123,11 @@ public class Block : MonoBehaviour {
     public void SetDragLimit((int left, int right) limit) {
 	    limitL = startX - limit.left;
 	    limitR = startX + limit.right;
-	    Debug.Log($"{startX} , {limitL}, {limitR}");
+	    //Debug.Log($"{startX} , {limitL}, {limitR}");
     }
     
     private void SendStartState() {
-        Debug.Log("send");
+        //Debug.Log("send");
         StartDrag.OnNext(new InitialDrag(this, spr, transform.position, blockSize));
     }
     

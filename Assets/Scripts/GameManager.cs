@@ -37,7 +37,7 @@ public class GameManager : MonoBehaviour {
     }
 
     private (int left, int right) LimitCalculator(int initialBlockCode) {
-	    Debug.Log(initialBlockCode + " << ");
+	    //Debug.Log(initialBlockCode + " << ");
 	    var current = new int[10];
 	    var firstIndex = 0;
 	    var lastIndex = 0;
@@ -72,7 +72,7 @@ public class GameManager : MonoBehaviour {
 		    if (current[i] != 0) break;
 		    right++;
 	    }
-	    Debug.Log($"left : {left} , right : {right}");
+	    //Debug.Log($"left : {left} , right : {right}");
 	    return (left, right);
     }
 
@@ -128,7 +128,7 @@ public class GameManager : MonoBehaviour {
         if (tempInitialDrag.pos == endPosition) return; //이동이 없었을 경우.
         //있을 경우 하술.
         int distance = (int)(endPosition.x - tempInitialDrag.pos.x);
-        Debug.Log(distance + " << ");
+//        Debug.Log(distance + " << ");
         
         //distance만큼 code블록을 이동.
         var movedLine = new int[10];

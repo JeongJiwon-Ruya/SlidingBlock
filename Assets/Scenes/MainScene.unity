@@ -559,7 +559,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7c8d47c518b57bf49a262c507ab33189, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  blockGenerator: {fileID: 0}
+  blockGenerator: {fileID: 519420036}
   silhouette: {fileID: 0}
   lines:
   - {fileID: 1494848162}

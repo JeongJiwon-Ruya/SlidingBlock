@@ -44,15 +44,16 @@ public class BlockGenerator : MonoBehaviour {
 	public List<Block> activeBlocksList = new(); //블록은 1차원 리스트에 저장해놔도 되지않나?
 
 	private void Start() {
+		BlockRandomGenerateList.Initialize();
+		newLineDataStack = GenerateBlocks();
 		StartCoroutine(InitializeNewBlock());
 	}
 
 	private IEnumerator InitializeNewBlock() {
-		
-		BlockRandomGenerateList.Initialize();
 		//1
 		Debug.Log("Phase 1 Start");
-		var newLineData = GenerateBlocks();
+		var newLineData = newLineDataStack;
+
 		var pastMatrix = (int[,])blockMatrix.Clone();
 
 		//1.5
@@ -61,13 +62,18 @@ public class BlockGenerator : MonoBehaviour {
 		var tempCodeIndex = 0;
 		var tempUIIndex = 0;
 		foreach (var t in newLineData.originalList) {
-			if (t > 0) {
-				Debug.Log("t : " + t);
+			if (t > 0) {//t : block or space's length
+				//Debug.Log("t : " + t);
 				var newBlock = Instantiate(block[t-1]);
-				tempCodeIndex += t - 1; //하필 마지막값에서 code값을 뽑음...
 				newBlock.code = newLineData.codeArrayList[tempCodeIndex];
+				tempCodeIndex += t;
+				// 0 0 1 1 1 0 0 0 2 2, -2,3,-3,2
+				/*tempCodeIndex += t - 1; //하필 마지막값에서 code값을 뽑음...
+				newBlock.code = newLineData.codeArrayList[tempCodeIndex];*/
+				
+				
+				//Debug.Log(tempCodeIndex + " , " + t);
 				var xPos = 0; // 0 ~ 9 사이에. 1이면 그대로 배치, 2 -> 0.5 3 -> 1, 4 -> 1.5 5 -> 2
-				Debug.Log(tempCodeIndex + " , " + t);
 				newBlock.transform.position = new Vector3(tempUIIndex + t * 0.5f - 0.5f, -8, -9);
 				activeBlocksList.Add(newBlock);
 				risingBlocksData.Add(new BlockMoveData(newBlock, 1));
@@ -93,23 +99,38 @@ public class BlockGenerator : MonoBehaviour {
 		Debug.Log("Phase 2.5 Start");
 		//전 / 후의 매트릭스 정보를 모두 갖고, 두 행렬간 알고리즘 사용해야함.
 		//블록과 해당 블록이 올라갈 값을 모두 모아놓고 한번에 실행. 이 반복문은 올라간 값을 계산함
+		string temps ="";
+		foreach (var VARIABLE in activeBlocksList) {
+			temps += VARIABLE.code + " ";
+		}
+		Debug.Log("Active Block List : "+temps);
 		for (int i = 9; i > -1; i--) {
 			for (int j = 0; j < 10; j++) {
 				if (blockMatrix[i, j] == 0) continue;
 				for (int k = i; k < 10; k++) { //k는 pastMatrix를 search. 그니까 아래로 내려가야함. 과거엔 아래에 있었을테니까.
 					if (pastMatrix[k, j] == blockMatrix[i, j]) {
-						var risingDistance = i - k; //if a == 0이면 필요없는 값. i는 현재 행, k는 과거 행
+						var risingDistance = k - i; //if a == 0이면 필요없는 값. i는 현재 행, k는 과거 행
+						if(risingDistance == 0) continue;
+						//Debug.Log("FIND " + blockMatrix[i,j]);
 						var targetBlock = activeBlocksList.First(x => x.code == blockMatrix[i, j]);
+						if(risingBlocksData.Any(x => x.block.code == targetBlock.code)) continue;
 						risingBlocksData.Add(new BlockMoveData(targetBlock, risingDistance));
+						break;
 					}
 				}
 			}
 		}
-		
+
 		//3
 		Debug.Log("Phase 3 Start");
+		var test = "";
+		foreach (var VARIABLE in risingBlocksData) {
+			test += VARIABLE.block.code + "  ";
+		}
+
+		Debug.Log("rising Blocks Data : " + test);
 		float time = 0f;
-		float speed = 0.1f;
+		float speed = 0.01f;
 		while (time < 1f) {
 			foreach (var variable in risingBlocksData) {
 				variable.block.transform.Translate(new Vector3(0, variable.distance * speed, 0));
@@ -117,6 +138,83 @@ public class BlockGenerator : MonoBehaviour {
 			time += speed;
 			yield return new WaitForSeconds(Time.deltaTime);
 		}
+		
+		//============================중력 알고리즘 ================
+		var pastMatrix0 = (int[,])blockMatrix.Clone();
+			for (int i = 9; i > -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
+				int firstIndex = 0;
+				while(firstIndex < 10) { //이 while문은 한줄을 처리함.
+					/*
+					 * for문 한번에 끝나려면 행렬을 마지막에 업데이트 해야함
+					 *
+					 * 0. 0일때는 pass. 0이외일때만 탐색
+					 * 1. '4'를 탐지한 후, '4'가 몇번째 열까지 있는지 확인
+					 * 2. 첫번째'4', 마지막 '4'의 index값을 갖고 아래로 탐색 시작
+					 * 3. 첫번째, 마지막 위치 값이 모두 0이면 아래로 진행.
+					 * 4. 첫번째, 마지막 둘중 하나라도 0이 아니면 break.
+					 * 5. 아래의 0을 찾았다면, 마지막 0의 위치로 4들을 이동시킴. 아니면 이동시키면서 아래로 진행해도됨. 이동시키면서 탐색하는게 좋을듯?
+					 * 6. 다음 index는 4의 마지막 위치 다음부터 다시 진행
+					 */
+					if(blockMatrix[i,firstIndex] == 0) {
+						//블록 없음.
+						firstIndex++;
+						continue;
+					}
+					//블록이 존재.
+					var currentBlockCode = blockMatrix[i, firstIndex];
+					int lastIndex = firstIndex;
+					while (true) { //어디까지 현재 블록이 있는지 탐색
+						if (lastIndex == 10 || blockMatrix[i, lastIndex] != currentBlockCode) {
+							lastIndex--;
+							break;
+						}
+						lastIndex++;
+					}
+					
+					for (int j = i+1; j < 10; j++) { //한칸 밑부터 아래로 검색
+						if (blockMatrix[j, firstIndex] == 0 && blockMatrix[j, lastIndex] == 0) { //밑에가 0이면,
+							for (int k = firstIndex; k <= lastIndex; k++) { //한칸 아래로 내리기
+								blockMatrix[j-1, k] = 0;
+								blockMatrix[j, k] = currentBlockCode;
+							} continue;
+						} break; //더 내려갈게 없다면, 이 블록에 대해 상황 종료.
+					}
+					firstIndex = lastIndex + 1;
+				}
+			}
+			//======================================7 종료)))))
+			Debug.Log("Phase 8 Start");
+			//8. 터지는 라인의 터지는 애니메이션 재생하면서, 중력이 반영되는 애니메이션 재생.
+			//터지는 애니메이션
+			var fallingBlocksData0 = new List<BlockMoveData>();
+			for (int i = 9; i > 0; i--) {
+				for (int j = 0; j < 9; j++) {
+					if (blockMatrix[i, j] == 0) continue;
+					for (int k = i; k > 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
+						if (pastMatrix0[k, j] == blockMatrix[i, j]) {
+							var fallingDistance = i - k; //if a == 0이면 필요없는 값. i는 현재 행, k는 과거 행
+							if(fallingDistance == 0) continue;
+							var targetBlock = activeBlocksList.First(x => x.code == blockMatrix[i, j]);
+							if(fallingBlocksData0.Any(x => x.block.code == targetBlock.code)) continue;
+							fallingBlocksData0.Add(new BlockMoveData(targetBlock, fallingDistance));
+							break;
+						}
+					}
+				}
+			}
+			
+			time = 0f;
+			speed = 0.01f;
+			while (time < 1f) {
+				foreach (var variable in fallingBlocksData0) {
+					variable.block.transform.Translate(new Vector3(0, -variable.distance * speed, 0));
+				}
+				time += speed;
+				yield return new WaitForSeconds(Time.deltaTime);
+			}
+			//============================중력 알고리즘 END================
+		
+		
 		
 		Search:
 		
@@ -159,7 +257,7 @@ public class BlockGenerator : MonoBehaviour {
 				}
 			}
 
-			for (int i = destroyLines[0]-1; i > -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
+			for (int i = 9; i > -1; i--) { //계산 최소화를 위해 i를 전체순회하지않음
 				int firstIndex = 0;
 				while(firstIndex < 10) { //이 while문은 한줄을 처리함.
 					/*
@@ -182,7 +280,7 @@ public class BlockGenerator : MonoBehaviour {
 					var currentBlockCode = blockMatrix[i, firstIndex];
 					int lastIndex = firstIndex;
 					while (true) { //어디까지 현재 블록이 있는지 탐색
-						if (blockMatrix[i, lastIndex] != currentBlockCode) {
+						if (lastIndex == 10 || blockMatrix[i, lastIndex] != currentBlockCode) {
 							lastIndex--;
 							break;
 						}
@@ -212,21 +310,24 @@ public class BlockGenerator : MonoBehaviour {
 			for (int i = 8; i > 0; i--) {
 				for (int j = 0; j < 9; j++) {
 					if (blockMatrix[i, j] == 0) continue;
-					for (int k = i; k < 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
+					for (int k = i; k > 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
 						if (pastMatrix2[k, j] == blockMatrix[i, j]) {
 							var fallingDistance = i - k; //if a == 0이면 필요없는 값. i는 현재 행, k는 과거 행
+							if(fallingDistance == 0) continue;
 							var targetBlock = activeBlocksList.First(x => x.code == blockMatrix[i, j]);
+							if(fallingBlocksData.Any(x => x.block.code == targetBlock.code)) continue;
 							fallingBlocksData.Add(new BlockMoveData(targetBlock, fallingDistance));
+							break;
 						}
 					}
 				}
 			}
 			//떨어지는 애니메이션 재생.
 			time = 0f;
-			speed = 0.1f;
+			speed = 0.01f;
 			while (time < 1f) {
 				foreach (var variable in fallingBlocksData) {
-					variable.block.transform.Translate(new Vector3(variable.distance * speed, 0, 0));
+					variable.block.transform.Translate(new Vector3(0, -variable.distance * speed, 0));
 				}
 				time += speed;
 				yield return new WaitForSeconds(Time.deltaTime);
@@ -246,15 +347,24 @@ public class BlockGenerator : MonoBehaviour {
 		}
 
 		Debug.Log(temp);
+		newLineDataStack = GenerateBlocks();
+		var tempStack = "";
+		foreach (var VARIABLE in newLineDataStack.Item2) {
+			tempStack += VARIABLE + "  ";
+		}
+
+		Debug.Log("nextLine : " + tempStack);
 	}
 
+	public (List<int> originalList, int[] codeArrayList) newLineDataStack;
+	
 	private (List<int> originalList, int[] codeArrayList) GenerateBlocks() {
         var current = BlockRandomGenerateList.GetActive10List();
         var result = new int[10];
         
         var index = 0;
         foreach (var variable in current) {
-            Debug.Log(variable > 0 ? $"블록 : {variable}" : $"빈칸 : {variable}");
+            //Debug.Log(variable > 0 ? $"블록 : {variable}" : $"빈칸 : {variable}");
             var tempBlockCode = blockCode++;
             var max = index;
 	            for (int i = index; i < max + Mathf.Abs(variable); i++) {
@@ -271,7 +381,8 @@ public class BlockGenerator : MonoBehaviour {
 	        s += VARIABLE + " ";
         }
 
-        Debug.Log("result : " + s);
+//        Debug.Log("result : " + s);
+        
         return (current, result); 
     }
 	
@@ -329,59 +440,32 @@ public class BlockGenerator : MonoBehaviour {
 		}
 		
 		var fallingBlocksData1 = new List<BlockMoveData>();
-		for (int i = 8; i > 0; i--) {
+		for (int i = 9; i > 0; i--) {
 			for (int j = 0; j < 9; j++) {
 				if (blockMatrix[i, j] == 0) continue;
-				for (int k = i; k < 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
+				for (int k = i; k > 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
 					if (pastMatrix1[k, j] == blockMatrix[i, j]) {
 						var fallingDistance = i - k; //if a == 0이면 필요없는 값. i는 현재 행, k는 과거 행
+						if(fallingDistance == 0) continue;
 						var targetBlock = activeBlocksList.First(x => x.code == blockMatrix[i, j]);
+						if(fallingBlocksData1.Any(x => x.block.code == targetBlock.code)) continue;
 						fallingBlocksData1.Add(new BlockMoveData(targetBlock, fallingDistance));
+						break;
 					}
 				}
 			}
 		}
 		//떨어지는 애니메이션 재생.
 		float time = 0f;
-		float speed = 0.1f;
+		float speed = 0.01f;
 		while (time < 1f) {
 			foreach (var variable in fallingBlocksData1) {
-				variable.block.transform.Translate(new Vector3(variable.distance * speed, 0, 0));
+				Debug.Log(variable.block.code + " falling");
+				variable.block.transform.Translate(new Vector3(0, -variable.distance * speed, 0));
 			}
 			time += speed;
 			yield return new WaitForSeconds(Time.deltaTime);
 		}
-		
-		/*int leftFall = 0;
-		int rightFall = 0;
-		for (int i = 0; i < 10; i++) {
-			if (blockMatrix[existLineIndex, i] == blockCode) {
-				for (int j = existLineIndex + 1; j < 10; j++) {
-					if (blockMatrix[j, i] != 0) break;
-					leftFall++;
-				}
-			}
-		}
-		for (int i = 9; i > -1; i--) {
-			if (blockMatrix[existLineIndex, i] == blockCode) {
-				for (int j = existLineIndex + 1; j < 10; j++) {
-					if (blockMatrix[j, i] != 0) break;
-					rightFall++;
-				}
-			}
-		}
-		int fallDistance = Mathf.Min(leftFall, rightFall);
-		//상하 행렬값 이동 적용
-		for (int i = 0; i < 10; i++) {
-			if (blockMatrix[existLineIndex, i] == blockCode) {
-				blockMatrix[existLineIndex, i] = 0;
-				blockMatrix[existLineIndex + fallDistance, i] = blockCode;
-			}
-		}*/
-		/*
-		 * 상하 이동 애니메이션 재생
-		 * activeBlockList에서 끌어와서 fallDistance만큼 재생시키면 될듯.
-		 */
 		
 		
 		
@@ -451,7 +535,7 @@ public class BlockGenerator : MonoBehaviour {
 					var currentBlockCode = blockMatrix[i, firstIndex];
 					int lastIndex = firstIndex;
 					while (true) { //어디까지 현재 블록이 있는지 탐색
-						if (blockMatrix[i, lastIndex] != currentBlockCode) {
+						if (lastIndex == 10 || blockMatrix[i, lastIndex] != currentBlockCode) {
 							lastIndex--;
 							break;
 						}
@@ -477,25 +561,28 @@ public class BlockGenerator : MonoBehaviour {
 				//* blk.SetDestroyAnimation(destroy)뭐 이런식으로 하고.. 거기서 destroy하는걸로 처리
 				blk.DestroyAnimation();
 			}
-			var fallingBlocksData = new List<BlockMoveData>();
-			for (int i = 8; i > 0; i--) {
+			var fallingBlocksData = new List<BlockMoveData>(); //움직임으로 터졌을때 여기서 처리
+			for (int i = 9; i > 0; i--) {
 				for (int j = 0; j < 9; j++) {
 					if (blockMatrix[i, j] == 0) continue;
-					for (int k = i; k < 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
+					for (int k = i; k > 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
 						if (pastMatrix2[k, j] == blockMatrix[i, j]) {
 							var fallingDistance = i - k; //if a == 0이면 필요없는 값. i는 현재 행, k는 과거 행
+							if(fallingDistance == 0) continue;
 							var targetBlock = activeBlocksList.First(x => x.code == blockMatrix[i, j]);
+							if(fallingBlocksData.Any(x => x.block.code == targetBlock.code)) continue;
 							fallingBlocksData.Add(new BlockMoveData(targetBlock, fallingDistance));
+							break;
 						}
 					}
 				}
 			}
 			//떨어지는 애니메이션 재생.
 			time = 0f;
-			speed = 0.1f;
+			speed = 0.01f;
 			while (time < 1f) {
 				foreach (var variable in fallingBlocksData) {
-					variable.block.transform.Translate(new Vector3(variable.distance * speed, 0, 0));
+					variable.block.transform.Translate(new Vector3(0, -variable.distance * speed, 0));
 				}
 				time += speed;
 				yield return new WaitForSeconds(Time.deltaTime);
