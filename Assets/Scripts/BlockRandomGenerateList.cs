@@ -5,18 +5,18 @@ using UnityEngine;
 
 public static class BlockRandomGenerateList{
     // 1부터 5까지의 숫자
-    private static readonly int[] numbers = { 1, 2, 3, 4 };
+    private static readonly int[] numbers = { 1, 2, 3, 4, 5};
     private static IEnumerable<IEnumerable<int>> combinations;
     private static List<List<int>> sum10List;
 
     public static void Initialize() {
         sum10List = new List<List<int>>();
-        for (int i = 3; i < 10; i++) {
+        for (int i = 3; i < 7; i++) {
             combinations = GetCombinationsWithReplacement(numbers, i);
             
             // 각 조합에 대해 합이 10인 경우만 출력
             foreach (IEnumerable<int> combination in combinations) {
-                if (combination.Sum() == 10 && (combination.Count(item => item == 1) < 10)) {
+                if (combination.Sum() == 10/* && (combination.Count(item => item == 1) < 5*/) {
                     sum10List.Add(combination.ToList());
 //                    Debug.Log(string.Join(" + ", combination) + " = 10");
                 }
@@ -41,13 +41,13 @@ public static class BlockRandomGenerateList{
         var minValue = selectList.Min();
         for (int i = 0; i < selectList.Count; i++) {
             if (selectList[i] == maxValue) continue;
-            if (selectList[i] == minValue) {
+            /*if (selectList[i] == minValue) {
                 selectList[i] = -selectList[i];
-            } else {
+            } else {*/
                 var random = new System.Random();
                 var sign = random.Next(2);
                 selectList[i] = sign == 0 ? -selectList[i] : selectList[i];
-            }
+            
 
         }
         return selectList;
