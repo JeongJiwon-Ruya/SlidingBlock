@@ -74,7 +74,7 @@ public class BlockGenerator : MonoBehaviour {
 				
 				//Debug.Log(tempCodeIndex + " , " + t);
 				var xPos = 0; // 0 ~ 9 사이에. 1이면 그대로 배치, 2 -> 0.5 3 -> 1, 4 -> 1.5 5 -> 2
-				newBlock.transform.position = new Vector3(tempUIIndex + t * 0.5f - 0.5f, -8, -9);
+				newBlock.transform.position = new Vector3(tempUIIndex + t * 0.5f - 0.5f, 0, -9);
 				activeBlocksList.Add(newBlock);
 				risingBlocksData.Add(new BlockMoveData(newBlock, 1));
 			} else {
@@ -307,7 +307,7 @@ public class BlockGenerator : MonoBehaviour {
 				blk.DestroyAnimation();
 			}
 			var fallingBlocksData = new List<BlockMoveData>();
-			for (int i = 8; i > 0; i--) {
+			for (int i = 9; i > 0; i--) {
 				for (int j = 0; j < 9; j++) {
 					if (blockMatrix[i, j] == 0) continue;
 					for (int k = i; k > 0; k--) { //과거엔 현재보다 블록들이 더 위에 있었을것.
